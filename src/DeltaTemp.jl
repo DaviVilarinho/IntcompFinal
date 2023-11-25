@@ -6,6 +6,7 @@ using DataFrames
 using Dates
 using CategoricalArrays
 using DataFrames
+using Random
 
 function cardinalToRadians(cardinal_point::Union{AbstractString,Missing})::Union{Float64,Missing}
   if ismissing(cardinal_point)
