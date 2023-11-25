@@ -55,8 +55,13 @@ function readAndProcessData(lines::Int64=0)
     dataframe[!, directionColumn] .= cardinalToRadians.(dataframe[!, directionColumn])
   end
   # primeiro, dataframe sem os spikes...
-  dataframe = select(dataframe, Not([:Location]))
+  locs = unique(dataframe.Location)
+  locDict = Dict()
+  for i in eachindex(locs)
+    locDict[locs[i]] = i
+  end
 
+  dataframe.Location = map(l -> get(locDict, locDict, 0), dataframe.Location)
   dataframe.Date = map(d -> datetime2unix(DateTime(d)), dataframe.Date)
   dataframe.RainToday .= coalesce.(dataframe.RainToday, "No")
   dataframe.RainTomorrow .= coalesce.(dataframe.RainTomorrow, "No")
@@ -73,7 +78,7 @@ function readAndProcessData(lines::Int64=0)
   return dataframe
 end
 
-data = readAndProcessData()
+data = readAndProcessData(10000)
 
 Flux.Random.seed!(42)
 
@@ -89,7 +94,7 @@ y_train = select(data, [:RainTomorrow])[train_indices, :]
 y_test = select(data, [:RainTomorrow])[test_indices, :]
 
 model = Chain(
-  Dense(21 => 42, σ),
+  Dense(size(x_train, 2) => 42, σ),
   Dense(42 => 2, σ),
   softmax)
 optim = Flux.setup(Flux.Adam(0.01), model)
