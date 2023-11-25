@@ -22,7 +22,7 @@ model = Chain(
 optim = Flux.setup(Flux.Adam(0.01), model)
 
 losses = []
-for epoch in 1:1_000
+for epoch in 1:10#_000
   for (x_t, y_t) in data_train
     e_loss, grads = Flux.withgradient(model) do m
       y_hat = m([x_t])
