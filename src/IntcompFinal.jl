@@ -70,7 +70,7 @@ function readAndProcessData(lines::Int64=0)
   return dataframe
 end
 
-data = DataFrame(readAndProcessData(50000))
+data = DataFrame(readAndProcessData(10000))
 deltaTemp = data.MaxTemp .- data.MinTemp
 data.DeltaTemp = deltaTemp
 data.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false], data.RainTomorrow)
@@ -90,8 +90,8 @@ data_train = data[train_indices, :]
 data_test = data[test_indices, :]
 
 model = Chain(
-  Dense(1 => 2, σ),
-  Dense(2 => 2),
+  Dense(1 => 10, relu),
+  Dense(10 => 2, σ),
   softmax)
 optim = Flux.setup(Flux.Adam(0.01), model)
 
