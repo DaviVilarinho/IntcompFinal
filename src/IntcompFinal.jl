@@ -12,8 +12,16 @@ data.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false
 data = select(data, [:DeltaTemp, :RainTomorrow])
 data = map(row -> (row.DeltaTemp, row.RainTomorrow), eachrow(data))
 
-data_train = data[1:70, :]
-data_test = data[71:100, :]
+Flux.Random.seed!(42)
+
+indices = shuffle(1:size(data, 1))
+split_idx = Int(round(0.7 * size(data, 1)))
+
+train_indices = indices[1:split_idx]
+test_indices = indices[split_idx+1:end]
+
+data_train = data[train_indices, :]
+data_test = data[test_indices, :]
 
 model = Chain(
   Dense(1 => 2, σ),
