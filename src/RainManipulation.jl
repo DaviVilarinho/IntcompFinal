@@ -1,9 +1,8 @@
 module RainManipulation
-using CSV
+using DelimitedFiles, DataFrames
 using DataFrames
 using Dates
-using Flux
-using MLJ
+using CategoricalArrays
 export readAndPreprocessData
 
 function cardinalToRadians(cardinal_point::Union{AbstractString,Missing})::Union{Float64,Missing}
@@ -44,24 +43,25 @@ function readAndPreprocessData(lines::Int64=0)
     :RainToday => String,
     :RainTomorrow => String
   )
+  data, header = readdlm("weatherAUS.csv", ',', header=true)
+  dataframe = DataFrame(data, vec(header))
 
-  dataframe = CSV.File("weatherAUS.csv", types=column_types, missingstrings=["NA"]) |> DataFrame
   if lines > 0
     dataframe = dataframe |> x -> first(x, lines)
   end
+  # primeiro, dataframe sem os spikes...
+  dataframe = dropmissing!(dataframe)
+  select!(dataframe, Not([:Location, :WindDir3pm, :WindDir9am, :WindGustDir]))
 
-  dataframe.RainToday .= dataframe.RainToday .== "Yes"
-  dataframe.RainTomorrow .= dataframe.RainTomorrow .== "Yes"
+  dataframe.Date = map(DateTime, dataframe.Date)
+  dataframe.Date = map(datetime2unix, dataframe.Date)
+  dataframe.RainToday = dataframe.RainToday .== "Yes"
+  dataframe.RainTomorrow = dataframe.RainTomorrow .== "Yes"
 
-  dataframe[!, :Date] = Dates.datetime2unix.(DateTime.(dataframe[!, :Date]))
 
-  #categorical_directions = categorical(["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"], ordered=True)
-
-  for cardinalFeature in [:WindDir9am, :WindDir3pm, :WindGustDir]
-    dataframe[!, cardinalFeature] = cardinalToRadians.(dataframe[!, cardinalFeature])
-  end
-
-  #dataframe = coalesce.(dataframe, 0)
+  #for categoricalColumn in [:Location, :WindDir3pm, :WindDir9am, :WindGustDir]
+  #  dataframe[!, categoricalColumn] = categorical(dataframe[!, categoricalColumn])
+  #end
 
   return dataframe
 end

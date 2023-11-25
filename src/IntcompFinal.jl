@@ -1,54 +1,46 @@
 
-module IntcompFinal
-using Flux
-using Statistics: mean, std
+#module IntcompFinal
 include("RainManipulation.jl")
 using .RainManipulation
+using Flux
+using DataFrames
 
 data = readAndPreprocessData(100)
-X = Matrix(data[:, setdiff(names(data), [:RainTomorrow])])
-y = data.RainTomorrow
+data.DeltaTemp = data.MaxTemp .- data.MinTemp
+data.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false], data.RainTomorrow)
 
-variable_names = names(data)
-variable_types = eltype.(eachcol(data))
+data = select(data, [:DeltaTemp, :RainTomorrow])
+data = map(row -> (row.DeltaTemp, row.RainTomorrow), eachrow(data))
 
-# Print variable names and types
-for (name, typ) in zip(variable_names, variable_types)
-  println("Variable Name: $name, Type: $typ")
-end
-split_ratio = 0.8
-split_idx = Int(round(size(X, 1) * split_ratio))
-X_train, X_test = X[1:split_idx, :], X[split_idx+1:end, :]
-y_train, y_test = y[1:split_idx], y[split_idx+1:end]
-
-
-println("Creating model")
+data_train = data[1:70, :]
+data_test = data[71:100, :]
 
 model = Chain(
-  Dense(size(X_train, 2), 64, relu),
-  Dense(64, 1),
-  softmax
-)
+  Dense(1 => 2, σ),
+  Dense(2 => 2),
+  softmax)
+optim = Flux.setup(Flux.Adam(0.01), model)
 
-println("Model Created")
-loss(x, y) = Flux.mse(model(x), y)
-
-optimizer = ADAM()
-
-println("training")
-
-data_train = [(X_train[i, :], y_train[i]) for i in 1:size(X_train, 1)]
-Flux.train!(loss, Flux.params(model), data_train, optimizer)
-
-print(size(X_test))
-y_pred = []
-
-for i in 1:size(X_test, 1)
-  push!(y_pred, model(X_test[i, :]))
+losses = []
+for epoch in 1:1_000
+  for (x_t, y_t) in data_train
+    e_loss, grads = Flux.withgradient(model) do m
+      y_hat = m([x_t])
+      Flux.crossentropy(y_hat, y_t)
+    end
+    Flux.update!(optim, model, grads[1])
+    push!(losses, e_loss)
+  end
 end
 
-y_pred = hcat(y_pred...)[:]
+correct = []
 
-mse = Flux.mse(y_pred, y_test)
-println("Mean Squared Error on Test Set: $mse")
+for (Δ, hotmax) in data_test
+  if ((model([Δ])[1] >= 0.5) == hotmax[1])
+    push!(correct, 1)
+  end
 end
+
+print(length(correct), "/ 30 corretos")
+
+#end
