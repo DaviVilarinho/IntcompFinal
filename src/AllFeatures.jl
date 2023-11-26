@@ -83,7 +83,7 @@ function readAndProcessData(lines::Int64=0)
   return dataframe
 end
 
-function main(fun::Function=relu, inputdata::Int64=145460, epoch::Int64=150)
+function main(fun::Function=σ, inputdata::Int64=145460, epoch::Int64=150)
   data = readAndProcessData(inputdata)
 
   Flux.Random.seed!(42)
@@ -119,8 +119,8 @@ function main(fun::Function=relu, inputdata::Int64=145460, epoch::Int64=150)
     for i in 1:size(x_train, 1)
       x_t = collect(x_train[i, :])
       y_t = y_train.RainTomorrow[i]
-      e_loss, grads = Flux.withgradient(model) do m
-        y_hat = m(x_t)
+      e_loss, grads = Flux.withgradient(model) do predict
+        y_hat = predict(x_t)
         Flux.crossentropy(y_hat, y_t)
       end
       Flux.update!(optim, model, grads[1])
