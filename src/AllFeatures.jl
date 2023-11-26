@@ -73,13 +73,18 @@ function readAndProcessData(lines::Int64=0)
   dataframe.RainTomorrow .= coalesce.(dataframe.RainTomorrow, "No")
   dataframe.RainToday = dataframe.RainToday .== "Yes"
   dataframe.RainTomorrow = dataframe.RainTomorrow .== "Yes"
-  dataframe.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false], dataframe.RainTomorrow)
-
   dataframe .= coalesce.(dataframe, 0.0)
+
+  for c in filter(n -> n != "RainTomorrow" && n != "RainToday", names(dataframe))
+    dataframe[:, c] = Flux.normalise(dataframe[:, c])
+  end
+
+  dataframe.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false], dataframe.RainTomorrow)
 
   return dataframe
 end
-inputdata = 10_000
+
+inputdata = 1000 #145460
 data = readAndProcessData(inputdata)
 
 Flux.Random.seed!(42)
@@ -108,16 +113,23 @@ model = Chain(
   softmax
 )
 
-optim = Flux.setup(Flux.Descent(0.05), model)
+optim = Flux.setup(Flux.Adam(0.1), model)
 
-x_matrix_train = transpose(coalesce.(Matrix(x_train)))
-y_matrix_train = hcat(y_train[:, :RainTomorrow]...)
-epoch = 10
-loader = Flux.DataLoader((x_matrix_train, y_matrix_train), batchsize=50, shuffle=true);
-for epoch in 1:epoch
-  Flux.train!(model, loader, optim) do m, x_t, y_t
-    y_hat = m(x_t)
-    Flux.crossentropy(y_hat, y_t)
+epoch = 10000
+for e in 1:epoch#_000
+  losses = []
+  for i in 1:size(x_train, 1)
+    x_t = collect(x_train[i, :])
+    y_t = y_train.RainTomorrow[i]
+    e_loss, grads = Flux.withgradient(model) do m
+      y_hat = m(x_t)
+      Flux.crossentropy(y_hat, y_t)
+    end
+    Flux.update!(optim, model, grads[1])
+    push!(losses, e_loss)
+  end
+  if e % 50 == 0
+    println("Época: $e, loss: ", mean(losses))
   end
 end
 
