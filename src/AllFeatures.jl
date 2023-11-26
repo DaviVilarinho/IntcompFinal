@@ -98,24 +98,21 @@ y_test = select(data, [:RainTomorrow])[test_indices, :]
 
 mlp_hidden = 10
 model = Chain(
-  Dense(size(x_train, 2) => mlp_hidden, tanh),
-  Dense(mlp_hidden => mlp_hidden, relu),
+  Dense(size(x_train, 2) => mlp_hidden, σ),
+  Dense(mlp_hidden => mlp_hidden, σ),
   Dense(mlp_hidden => 2, σ),
   softmax)
-optim = Flux.setup(Flux.Descent(0.15), model)
+optim = Flux.setup(Flux.Descent(0.05), model)
 
+x_matrix_train = transpose(coalesce.(Matrix(x_train)))
+y_matrix_train = hcat(y_train[:, :RainTomorrow]...)
 losses = []
-epoch = 1_000
-for epoch in 1:epoch#_000
-  for i in 1:size(x_train, 1)
-    x_t = collect(x_train[i, :])
-    y_t = y_train.RainTomorrow[i]
-    e_loss, grads = Flux.withgradient(model) do m
-      y_hat = m(x_t)
-      Flux.crossentropy(y_hat, y_t)
-    end
-    Flux.update!(optim, model, grads[1])
-    push!(losses, e_loss)
+epoch = 10_000
+loader = Flux.DataLoader((x_matrix_train, y_matrix_train), batchsize=20, shuffle=true);
+for epoch in 1:epoch
+  Flux.train!(model, loader, optim) do m, x_t, y_t
+    y_hat = m(x_t)
+    Flux.crossentropy(y_hat, y_t)
   end
 end
 
