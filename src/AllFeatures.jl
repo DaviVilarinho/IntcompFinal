@@ -1,5 +1,4 @@
-
-#module IntcompFinal
+module AllFeatures
 using Flux
 using CSV, DataFrames
 using DataFrames
@@ -84,72 +83,74 @@ function readAndProcessData(lines::Int64=0)
   return dataframe
 end
 
-inputdata = 145460
-data = readAndProcessData(inputdata)
+function main(fun::Function=relu, inputdata::Int64=145460, epoch::Int64=150)
+  data = readAndProcessData(inputdata)
 
-Flux.Random.seed!(42)
+  Flux.Random.seed!(42)
 
-indices = shuffle(1:size(data, 1))
-split_idx = Int(round(0.7 * size(data, 1)))
+  indices = shuffle(1:size(data, 1))
+  split_idx = Int(round(0.7 * size(data, 1)))
 
-train_indices = indices[1:split_idx]
-test_indices = indices[split_idx+1:end]
+  train_indices = indices[1:split_idx]
+  test_indices = indices[split_idx+1:end]
 
-x_train = select(data, Not([:RainTomorrow]))[train_indices, :]
-x_test = select(data, Not([:RainTomorrow]))[test_indices, :]
-y_train = select(data, [:RainTomorrow])[train_indices, :]
-y_test = select(data, [:RainTomorrow])[test_indices, :]
+  x_train = select(data, Not([:RainTomorrow]))[train_indices, :]
+  x_test = select(data, Not([:RainTomorrow]))[test_indices, :]
+  y_train = select(data, [:RainTomorrow])[train_indices, :]
+  y_test = select(data, [:RainTomorrow])[test_indices, :]
 
-mlp_more = 64
-mlp_hidden = 32
-mlp_less = 16
-input_size = size(x_train, 2)
+  mlp_more = 64
+  mlp_hidden = 32
+  mlp_less = 16
+  input_size = size(x_train, 2)
 
-model = Chain(
-  Dense(input_size => mlp_more, σ),
-  Dense(mlp_more => mlp_hidden, σ),
-  Dense(mlp_hidden => mlp_less, σ),
-  Dense(mlp_less => 2, σ),
-  softmax
-)
+  model = Chain(
+    Dense(input_size => mlp_more, fun),
+    Dense(mlp_more => mlp_hidden, fun),
+    Dense(mlp_hidden => mlp_less, fun),
+    Dense(mlp_less => 2, fun),
+    softmax
+  )
 
-optim = Flux.setup(Flux.Adam(0.001), model)
+  optim = Flux.setup(Flux.Adam(0.001), model)
 
-epoch = 150#0
-for e in 1:epoch
-  losses = []
-  for i in 1:size(x_train, 1)
-    x_t = collect(x_train[i, :])
-    y_t = y_train.RainTomorrow[i]
-    e_loss, grads = Flux.withgradient(model) do m
-      y_hat = m(x_t)
-      Flux.crossentropy(y_hat, y_t)
+  for e in 1:epoch
+    losses = []
+    for i in 1:size(x_train, 1)
+      x_t = collect(x_train[i, :])
+      y_t = y_train.RainTomorrow[i]
+      e_loss, grads = Flux.withgradient(model) do m
+        y_hat = m(x_t)
+        Flux.crossentropy(y_hat, y_t)
+      end
+      Flux.update!(optim, model, grads[1])
+      push!(losses, e_loss)
     end
-    Flux.update!(optim, model, grads[1])
-    push!(losses, e_loss)
+    if e % ceil(epoch / 10) == 0
+      println("Época: $e, loss: ", mean(losses))
+    end
   end
-  if e % ceil(epoch / 10) == 0
-    println("Época: $e, loss: ", mean(losses))
+
+  correct = []
+  for i in 1:size(x_test, 1)
+
+    does_rain = model(collect(x_test[i, :]))[2]
+    if ((does_rain >= 0.5) == y_test.RainTomorrow[i][2])
+      push!(correct, does_rain)
+    end
+  end
+
+  n_correct = length(correct)
+  n_test = size(x_test, 1)
+  println("$n_correct / $n_test (", n_correct * 100 / n_test, "%) corretos")
+
+  model_state = Flux.state(model)
+
+  nowmoment = string(Dates.now())
+
+  if inputdata > 10_000
+    @save "./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.bson" model
+    jldsave("./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.jld2"; model_state)
   end
 end
-
-correct = []
-for i in 1:size(x_test, 1)
-
-  does_rain = model(collect(x_test[i, :]))[2]
-  if ((does_rain >= 0.5) == y_test.RainTomorrow[i][2])
-    push!(correct, does_rain)
-  end
 end
-
-n_correct = length(correct)
-n_test = size(x_test, 1)
-print("$n_correct / $n_test (", n_correct * 100 / n_test, "%) corretos")
-
-model_state = Flux.state(model);
-
-nowmoment = string(Dates.now())
-
-jldsave("./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.jld2"; model_state)
-
-#end
