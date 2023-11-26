@@ -5,6 +5,7 @@ using CSV, DataFrames
 using DataFrames
 using Dates
 using Random
+using Statistics
 using CategoricalArrays
 using DataFrames
 
@@ -58,7 +59,7 @@ function readAndProcessData(lines::Int64=0)
   locs = unique(dataframe.Location)
   locDict = Dict()
   for i in eachindex(locs)
-    locDict[locs[i]] = i
+    locDict[locs[i]] = Float64(i)
   end
 
   dataframe.Location = map(l -> get(locDict, locDict, 0), dataframe.Location)
@@ -67,6 +68,7 @@ function readAndProcessData(lines::Int64=0)
   dataframe.RainTomorrow .= coalesce.(dataframe.RainTomorrow, "No")
   dataframe.RainToday = dataframe.RainToday .== "Yes"
   dataframe.RainTomorrow = dataframe.RainTomorrow .== "Yes"
+
   dataframe.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false], dataframe.RainTomorrow)
 
   dataframe .= coalesce.(dataframe, 0.0)
@@ -78,7 +80,7 @@ function readAndProcessData(lines::Int64=0)
   return dataframe
 end
 
-data = readAndProcessData(10000)
+data = readAndProcessData(5000)
 
 Flux.Random.seed!(42)
 
@@ -93,9 +95,11 @@ x_test = select(data, Not([:RainTomorrow]))[test_indices, :]
 y_train = select(data, [:RainTomorrow])[train_indices, :]
 y_test = select(data, [:RainTomorrow])[test_indices, :]
 
+mlp_hidden = 30
 model = Chain(
-  Dense(size(x_train, 2) => 42, σ),
-  Dense(42 => 2, σ),
+  Dense(size(x_train, 2) => mlp_hidden, relu),
+  Dense(mlp_hidden => mlp_hidden, tanh),
+  Dense(mlp_hidden => 2, σ),
   softmax)
 optim = Flux.setup(Flux.Adam(0.01), model)
 
