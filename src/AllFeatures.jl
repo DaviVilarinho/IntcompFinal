@@ -128,7 +128,7 @@ for e in 1:epoch
     Flux.update!(optim, model, grads[1])
     push!(losses, e_loss)
   end
-  if e % 50 == 0
+  if e % ceil(epoch / 10) == 0
     println("Época: $e, loss: ", mean(losses))
   end
 end
