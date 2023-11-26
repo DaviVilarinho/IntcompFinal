@@ -84,7 +84,7 @@ function readAndProcessData(lines::Int64=0)
   return dataframe
 end
 
-inputdata = 1000 #145460
+inputdata = 145460
 data = readAndProcessData(inputdata)
 
 Flux.Random.seed!(42)
@@ -100,9 +100,9 @@ x_test = select(data, Not([:RainTomorrow]))[test_indices, :]
 y_train = select(data, [:RainTomorrow])[train_indices, :]
 y_test = select(data, [:RainTomorrow])[test_indices, :]
 
-mlp_more = 20
-mlp_hidden = 16
-mlp_less = 8
+mlp_more = 64
+mlp_hidden = 32
+mlp_less = 16
 input_size = size(x_train, 2)
 
 model = Chain(
@@ -113,10 +113,10 @@ model = Chain(
   softmax
 )
 
-optim = Flux.setup(Flux.Adam(0.1), model)
+optim = Flux.setup(Flux.Adam(0.001), model)
 
-epoch = 10000
-for e in 1:epoch#_000
+epoch = 150#0
+for e in 1:epoch
   losses = []
   for i in 1:size(x_train, 1)
     x_t = collect(x_train[i, :])
