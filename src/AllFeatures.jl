@@ -8,6 +8,7 @@ using Random
 using Statistics
 using CategoricalArrays
 using DataFrames
+using JLD2
 
 function cardinalToRadians(cardinal_point::Union{AbstractString,Missing,String})::Union{Float64,Missing}
   if ismissing(cardinal_point) || cardinal_point == "NA"
@@ -79,8 +80,8 @@ function readAndProcessData(lines::Int64=0)
 
   return dataframe
 end
-
-data = readAndProcessData(5000)
+inputdata = 1000
+data = readAndProcessData(inputdata)
 
 Flux.Random.seed!(42)
 
@@ -95,16 +96,17 @@ x_test = select(data, Not([:RainTomorrow]))[test_indices, :]
 y_train = select(data, [:RainTomorrow])[train_indices, :]
 y_test = select(data, [:RainTomorrow])[test_indices, :]
 
-mlp_hidden = 30
+mlp_hidden = 10
 model = Chain(
-  Dense(size(x_train, 2) => mlp_hidden, relu),
-  Dense(mlp_hidden => mlp_hidden, tanh),
+  Dense(size(x_train, 2) => mlp_hidden, tanh),
+  Dense(mlp_hidden => mlp_hidden, relu),
   Dense(mlp_hidden => 2, σ),
   softmax)
-optim = Flux.setup(Flux.Adam(0.01), model)
+optim = Flux.setup(Flux.Descent(0.15), model)
 
 losses = []
-for epoch in 1:20#_000
+epoch = 1_000
+for epoch in 1:epoch#_000
   for i in 1:size(x_train, 1)
     x_t = collect(x_train[i, :])
     y_t = y_train.RainTomorrow[i]
@@ -128,5 +130,11 @@ end
 n_correct = length(correct)
 n_test = size(x_test, 1)
 print("$n_correct / $n_test (", n_correct * 100 / n_test, "%) corretos")
+
+model_state = Flux.state(model);
+
+nowmoment = string(Dates.now())
+
+jldsave("./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.jld2"; model_state)
 
 #end
