@@ -53,34 +53,33 @@ function readAndProcessData(lines::Int64=0)
   if lines > 0
     dataframe = dataframe |> x -> first(x, lines)
   end
+  dataframe = select(dataframe, Not([:Evaporation, :Sunshine])) # describe mostra que tudo é NA
+  dropmissing!(dataframe)
+
   for directionColumn in [:WindDir3pm, :WindDir9am, :WindGustDir]
     dataframe[!, directionColumn] .= cardinalToRadians.(dataframe[!, directionColumn])
   end
-  # primeiro, dataframe sem os spikes...
+
   locs = unique(dataframe.Location)
   locDict = Dict()
   for i in eachindex(locs)
     locDict[locs[i]] = Float64(i)
   end
+  dataframe.Location = map(l -> get(locDict, l, 0), dataframe.Location)
 
-  dataframe.Location = map(l -> get(locDict, locDict, 0), dataframe.Location)
   dataframe.Date = map(d -> datetime2unix(DateTime(d)), dataframe.Date)
+
   dataframe.RainToday .= coalesce.(dataframe.RainToday, "No")
   dataframe.RainTomorrow .= coalesce.(dataframe.RainTomorrow, "No")
   dataframe.RainToday = dataframe.RainToday .== "Yes"
   dataframe.RainTomorrow = dataframe.RainTomorrow .== "Yes"
-
   dataframe.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false], dataframe.RainTomorrow)
 
   dataframe .= coalesce.(dataframe, 0.0)
 
-  #for categoricalColumn in [:Location, :WindDir3pm, :WindDir9am, :WindGustDir]
-  #  dataframe[!, categoricalColumn] = categorical(dataframe[!, categoricalColumn])
-  #end
-
   return dataframe
 end
-inputdata = 1000
+inputdata = 10_000
 data = readAndProcessData(inputdata)
 
 Flux.Random.seed!(42)
@@ -96,19 +95,25 @@ x_test = select(data, Not([:RainTomorrow]))[test_indices, :]
 y_train = select(data, [:RainTomorrow])[train_indices, :]
 y_test = select(data, [:RainTomorrow])[test_indices, :]
 
-mlp_hidden = 10
+mlp_more = 20
+mlp_hidden = 16
+mlp_less = 8
+input_size = size(x_train, 2)
+
 model = Chain(
-  Dense(size(x_train, 2) => mlp_hidden, σ),
-  Dense(mlp_hidden => mlp_hidden, σ),
-  Dense(mlp_hidden => 2, σ),
-  softmax)
+  Dense(input_size => mlp_more, σ),
+  Dense(mlp_more => mlp_hidden, σ),
+  Dense(mlp_hidden => mlp_less, σ),
+  Dense(mlp_less => 2, σ),
+  softmax
+)
+
 optim = Flux.setup(Flux.Descent(0.05), model)
 
 x_matrix_train = transpose(coalesce.(Matrix(x_train)))
 y_matrix_train = hcat(y_train[:, :RainTomorrow]...)
-losses = []
-epoch = 10_000
-loader = Flux.DataLoader((x_matrix_train, y_matrix_train), batchsize=20, shuffle=true);
+epoch = 10
+loader = Flux.DataLoader((x_matrix_train, y_matrix_train), batchsize=50, shuffle=true);
 for epoch in 1:epoch
   Flux.train!(model, loader, optim) do m, x_t, y_t
     y_hat = m(x_t)
@@ -117,10 +122,11 @@ for epoch in 1:epoch
 end
 
 correct = []
-
 for i in 1:size(x_test, 1)
-  if ((model(collect(x_test[i, :]))[1] >= 0.5) == y_test.RainTomorrow[i][1])
-    push!(correct, 1)
+
+  does_rain = model(collect(x_test[i, :]))[2]
+  if ((does_rain >= 0.5) == y_test.RainTomorrow[i][2])
+    push!(correct, does_rain)
   end
 end
 
