@@ -86,11 +86,11 @@ function readAndProcessData(lines::Int64=0, normalize=true)
   return dataframe
 end
 
-function main(; fun::Function=σ, epoch::Int64=150, inputdata::Int64=145460, normalize=true, optimizer=Flux.Adam(0.001))
+function main(; fun::Function=σ, epoch::Int64=150, inputdata::Int64=145460, normalize=true, optimizer=Flux.Adam(0.001), seed=42)
   data = readAndProcessData(inputdata, normalize)
 
-  Random.seed!(42)
-  Flux.Random.seed!(42)
+  Random.seed!(seed)
+  Flux.Random.seed!(seed)
 
   indices = shuffle(1:size(data, 1))
   split_idx = Int(round(0.7 * size(data, 1)))
