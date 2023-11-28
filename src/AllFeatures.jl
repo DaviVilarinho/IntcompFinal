@@ -86,7 +86,7 @@ function readAndProcessData(lines::Int64=0, normalize=true)
   return dataframe
 end
 
-function main(fun::Function=σ, epoch::Int64=25, inputdata::Int64=145460, normalize=true)
+function main(fun::Function=relu, epoch::Int64=150, inputdata::Int64=145460, normalize=true)
   data = readAndProcessData(inputdata, normalize)
 
   Random.seed!(42)
