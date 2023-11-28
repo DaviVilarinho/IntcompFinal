@@ -86,7 +86,7 @@ function readAndProcessData(lines::Int64=0, normalize=true)
   return dataframe
 end
 
-function main(fun::Function=σ, epoch::Int64=150, inputdata::Int64=145460, normalize=true)
+function main(; fun::Function=σ, epoch::Int64=150, inputdata::Int64=145460, normalize=true, optimizer=Flux.Adam(0.001))
   data = readAndProcessData(inputdata, normalize)
 
   Random.seed!(42)
@@ -116,8 +116,9 @@ function main(fun::Function=σ, epoch::Int64=150, inputdata::Int64=145460, norma
     softmax
   )
 
-  optim = Flux.setup(Flux.Adam(0.001), model)
+  optim = Flux.setup(optimizer, model)
 
+  csv_output = DataFrame(epoca=[], loss=[], tempo=[])
 
   println("época,média de loss,tempo de treino")
   for e in 1:epoch
@@ -133,8 +134,10 @@ function main(fun::Function=σ, epoch::Int64=150, inputdata::Int64=145460, norma
       Flux.update!(optim, model, grads[1])
       push!(losses, e_loss)
     end
-    println("$e,", mean(losses), ",", (now() - t_begin).value)
-
+    t_taken = (now() - t_begin).value
+    meanlosses = mean(losses)
+    println("$e,", meanlosses, ",", t_taken)
+    push!(csv_output, [e, meanlosses, t_taken])
   end
 
   correct = []
@@ -157,6 +160,7 @@ function main(fun::Function=σ, epoch::Int64=150, inputdata::Int64=145460, norma
   if inputdata > 10_000
     @save "./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.bson" model
     jldsave("./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.jld2"; model_state)
+    CSV.write("./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.csv", csv_output)
   end
   return model, data, x_test, y_test
 end
