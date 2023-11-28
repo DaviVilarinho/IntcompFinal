@@ -116,25 +116,25 @@ function main(fun::Function=σ, epoch::Int64=25, inputdata::Int64=145460, normal
     softmax
   )
 
-  optim = Flux.setup(Flux.Adam(2e-8), model)
+  optim = Flux.setup(Flux.Adam(0.001), model)
 
 
-  println("época,média de loss")
+  println("época,média de loss,tempo de treino")
   for e in 1:epoch
-    @time begin
-      losses = []
-      for i in 1:size(x_train, 1)
-        x_t = collect(Float32, x_train[i, :])
-        y_t = y_train.RainTomorrow[i]
-        e_loss, grads = Flux.withgradient(model) do predict
-          y_hat = predict(x_t)
-          Flux.crossentropy(y_hat, y_t)
-        end
-        Flux.update!(optim, model, grads[1])
-        push!(losses, e_loss)
+    t_begin = now()
+    losses = []
+    for i in 1:size(x_train, 1)
+      x_t = collect(Float32, x_train[i, :])
+      y_t = y_train.RainTomorrow[i]
+      e_loss, grads = Flux.withgradient(model) do predict
+        y_hat = predict(x_t)
+        Flux.crossentropy(y_hat, y_t)
       end
-      println("$e,", mean(losses))
+      Flux.update!(optim, model, grads[1])
+      push!(losses, e_loss)
     end
+    println("$e,", mean(losses), ",", (now() - t_begin).value)
+
   end
 
   correct = []
