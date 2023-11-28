@@ -152,5 +152,6 @@ function main(fun::Function=σ, inputdata::Int64=145460, epoch::Int64=150)
     @save "./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.bson" model
     jldsave("./models/$nowmoment-E$epoch-MLP$mlp_hidden-$inputdata-$n_correct-out-of-$n_test.jld2"; model_state)
   end
+  return model, data
 end
 end
