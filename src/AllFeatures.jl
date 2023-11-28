@@ -47,7 +47,7 @@ const COLUMN_TYPES = Dict(
   :RainTomorrow => String
 )
 
-function readAndProcessData(lines::Int64=0)
+function readAndProcessData(lines::Int64=0, normalize=true)
   dataframe = DataFrame(CSV.File("weatherAUS.csv", missingstring=["NA"], dateformat=Dates.ISODateFormat, types=COLUMN_TYPES))
 
   if lines > 0
@@ -75,8 +75,10 @@ function readAndProcessData(lines::Int64=0)
   dataframe.RainTomorrow = dataframe.RainTomorrow .== "Yes"
   dataframe .= coalesce.(dataframe, 0.0)
 
-  for c in filter(n -> n != "RainTomorrow" && n != "RainToday", names(dataframe))
-    dataframe[:, c] = Flux.normalise(dataframe[:, c])
+  if normalize
+    for c in filter(n -> n != "RainTomorrow" && n != "RainToday", names(dataframe))
+      dataframe[:, c] = Flux.normalise(dataframe[:, c])
+    end
   end
 
   dataframe.RainTomorrow = map(tomorrow -> tomorrow == 1 ? [false, true] : [true, false], dataframe.RainTomorrow)
@@ -84,9 +86,10 @@ function readAndProcessData(lines::Int64=0)
   return dataframe
 end
 
-function main(fun::Function=σ, inputdata::Int64=145460, epoch::Int64=150)
-  data = readAndProcessData(inputdata)
+function main(fun::Function=σ, epoch::Int64=25, inputdata::Int64=145460, normalize=true)
+  data = readAndProcessData(inputdata, normalize)
 
+  Random.seed!(42)
   Flux.Random.seed!(42)
 
   indices = shuffle(1:size(data, 1))
